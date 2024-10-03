@@ -1,0 +1,27 @@
+title: "VM Server"
+ldap_server: "ldap://127.0.0.1:3268"
+ldap_filter: "(&(objectcategory=person)(objectclass=person)(|(sAMAccountName={{email}})(userPrincipalName={{email}})))"
+ldap_base: "DC=domain,DC=com"
+ldap_upn: "userPrincipalName"
+ldap_protocol: 3
+secret: "CHANGE_ME"
+docker_prefix: pfx
+upperdir: ./data/upper
+workdir: ./data/work
+mergeddir: ./data/merged
+email_suffix: "@domain.com"
+favicon: "favicon.svg"
+apps:
+  Windows:
+    container: dockurr/windows:latest
+    icon: https://static-00.iconduck.com/assets.00/windows-icon-2018x2048-0y0cfqbh.png
+    mergedestination: /storage
+    lowerdir: /somewhere/windows_data
+    caps:
+      - NET_ADMIN
+    devices:
+      - /dev/kvm
+    env:
+      RAM_SIZE: 3G
+      CPU_CORES: 2
+      VERSION: "http://192.168.21.253:9000/tiny11%202311%20x64.iso"
