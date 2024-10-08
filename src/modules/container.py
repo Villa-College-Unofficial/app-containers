@@ -118,6 +118,13 @@ class Container:
         Returns:
             bool: True if started successfully
         """
+
+        # reset container before start
+        try:
+            self.destroy()
+        except:
+            pass
+
         # Create a new mount
         mntsuccess = overlaymount(self.mergeddir, [current_config.apps()[self.appname]["lowerdir"]], upperdir=self.upperdir, workdir=self.workdir)
         time.sleep(5) # Wait 5 seconds for mounts to complete
