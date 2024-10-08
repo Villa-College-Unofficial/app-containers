@@ -44,7 +44,7 @@ def login() -> Optional[RedirectResponse]:
             app.storage.user.update({ 'username': username.value, 'authenticated': False })
             return ui.notify('Wrong username or password', color='negative')
         # append email suffix if only username is specified
-        try_username = f"{username.value}@{current_config.email_suffix()}" if current_config.email_suffix() not in username.value else username.value
+        try_username = f"{username.value}{current_config.email_suffix()}" if current_config.email_suffix() not in username.value else username.value
 
         try:
             l = ldap.initialize(current_config.ldap_server())
