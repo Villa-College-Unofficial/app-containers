@@ -26,6 +26,7 @@ def container_toggle(appname:str, email:str):
 
         threading.Thread(target=start_thread, args= (cont,appname, email, )).start()
         ui.timer(1, lambda: ui.notify(f"Please wait while we start '{appname}' for you. This may take a while"), once=True)
+        # TODO: implement a more graceful solution to refresh app card
         ui.timer(10, lambda: ui.run_javascript("window.location.reload()"), once=True)
 
     def stopaction():
