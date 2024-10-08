@@ -8,45 +8,36 @@ from modules.container import Container
 from modules.config import current_config, dockerclient as client
 from fastapi import WebSocket
 from modules.utils import confirm
-from modules.proxy import AppProxy
+import time
+import requests
+import threading
 
 available_apps = current_config.apps()
-proxies = dict()
-
-def add_proxy(cont:Container):
-    ip = cont.docker_container.attrs['NetworkSettings']['IPAddress']
-    proxy = AppProxy(cont)
-    proxy.start()
-
-    proxies[cont.name] = proxy
-
-    return proxy
 
 existing_containers = Container.enumerate()
 for container in existing_containers:
     print(f"Adding existing container: '{container.name}'")
 
-    if container.name not in proxies.keys():
-        proxy = add_proxy(container)
-
-        print(f"'{container.name}' listening on '{proxy.http_port}'")
-
 def container_toggle(appname:str, email:str):
     def startaction():
-        started = cont.start()
-        print(f"Started '{appname}' for '{email}'" if started else f"Failed to started '{appname}' for '{email}'")
-        add_proxy(cont)
-        
+        def start_thread(cont, appname, email):
+            started = cont.start()
+            print(f"Started '{appname}' for '{email}'" if started else f"Failed to started '{appname}' for '{email}'")
+
+        threading.Thread(target=start_thread, args= (cont,appname, email, )).start()
+        ui.timer(1, lambda: ui.notify(f"Please wait while we start '{appname}' for you. This may take a while"), once=True)
+        ui.timer(10, lambda: ui.run_javascript("window.location.reload()"), once=True)
 
     def stopaction():
         contname = cont.name
-        stopped = cont.destroy()
-        print(f"Stopped '{appname}' for '{email}'" if stopped else f"Failed to stop '{appname}' for '{email}'")
-        try:
-            proxy = proxies.pop(contname)
-            proxy.stop()
-        except:
-            pass
+
+        def stop_thread(cont, appname, email):
+            stopped = cont.destroy()
+            print(f"Stopped '{appname}' for '{email}'" if stopped else f"Failed to stop '{appname}' for '{email}'")
+                
+        threading.Thread(target=stop_thread, args= (cont,appname, email, )).start()
+        ui.timer(1, lambda:  ui.notify(f"Please wait while we stop '{appname}' for you. This may take a while"), once=True)
+        ui.timer(10, lambda: ui.run_javascript("window.location.reload()"), once=True)
 
     cont = Container(email, appname)
 
@@ -54,6 +45,36 @@ def container_toggle(appname:str, email:str):
         confirm(f"Are you sure you want to destroy your {appname} instance?", confirm_action=stopaction)
     else:
         confirm(f"Are you sure you want to start your {appname} instance?", confirm_action=startaction)
+
+@ui.refreshable
+def container_card(appname, contname):
+    running = False
+    
+    try:
+        cont = client.containers.get(contname)
+        ports = cont.attrs['NetworkSettings']['Ports']
+        running = cont.status == "running"
+    except Exception as e:
+        running = False
+
+    if running:
+        with ui.button_group():
+            for port in ports.keys():
+                hostport = ports[port][0]['HostPort']
+                is_http = False
+                try:
+                    requests.head(f"http://localhost:{hostport}", timeout=0.1)
+                    is_http = True
+                except:
+                    pass
+                if is_http:
+                    ui.button(f"Connect {hostport}", color="green-600", on_click=lambda: ui.run_javascript(f"""
+                    window.open(window.location.href.split(':')[0] + "://" + window.location.hostname + ":{hostport}", "_blank");
+                    """))
+            ui.button("Stop", color="red-600", on_click=lambda:  container_toggle(appname, app.storage.user["username"]))
+    else:
+        with ui.button_group():
+            ui.button("Start", on_click=lambda:  container_toggle(appname, app.storage.user["username"]))
 
 @ui.page("/apps")
 def apps_view() -> None:
@@ -66,8 +87,8 @@ def apps_view() -> None:
         for appname in available_apps.keys():
             
             contname = Container.get_container_name(appname, app.storage.user["username"])
+            cont = None
             running = False
-            
             try:
                 cont = client.containers.get(contname)
                 running = cont.status == "running"
@@ -80,14 +101,16 @@ def apps_view() -> None:
                 ui.chip(text="RUNNING" if running else "STOPPED", color=("green-600" if running else "red-600")).classes("p-2 text-white rounded self-center text-center").props('round')
                 
                 with ui.card_section():
-                    if running:
-                        with ui.button_group():
-                            ui.button("Connect", color="green-600", on_click=lambda: ui.run_javascript(f"""
-                            window.open(window.location.href.split(':')[0] + "://" + window.location.hostname + ":{proxies[contname].http_port}", "_blank");
-                            """))
-                            ui.button("Stop", color="red-600", on_click=lambda:  container_toggle(appname, app.storage.user["username"]))
-                    else:
-                        with ui.button_group():
-                            ui.button("Start", on_click=lambda:  container_toggle(appname, app.storage.user["username"]))
+                    container_card(appname, contname)
+                    # print(contname in refresh_statuses)
+                    # # refresh every 2 seconds
+                    # def refresh():
+                    #     if contname in refresh_statuses:
+                    #         print("REF 2")
+                    #         container_card.refresh(appname, contname)
+                    #         refresh_statuses.remove(contname)
+                        
+                    # ui.timer(2, refresh)
+            
 
 ui.run(storage_secret=current_config.secret(), favicon=current_config.favicon())

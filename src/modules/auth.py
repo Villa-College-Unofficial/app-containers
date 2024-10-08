@@ -39,20 +39,23 @@ def login() -> Optional[RedirectResponse]:
     password = None
 
     def try_login() -> None:
-        if (not username.value) or (not (username.value.endswith('@students.villacollege.edu.mv') or username.value.endswith('@villacollege.edu.mv'))):
+        nonlocal username, password
+        if username.value is None:
             app.storage.user.update({ 'username': username.value, 'authenticated': False })
             return ui.notify('Wrong username or password', color='negative')
+        # append email suffix if only username is specified
+        try_username = f"{username.value}@{current_config.email_suffix()}" if current_config.email_suffix() not in username.value else username.value
 
         try:
             l = ldap.initialize(current_config.ldap_server())
             l.protocol_version = current_config.ldap_protocol()
             l.set_option(ldap.OPT_REFERRALS, 0)
-            l.simple_bind_s(username.value, password.value)
+            l.simple_bind_s(try_username, password.value)
 
-            app.storage.user.update({ 'username': username.value, 'authenticated': True })
+            app.storage.user.update({ 'username': try_username, 'authenticated': True })
             ui.navigate.to(app.storage.user.get('referrer_path', '/'))
         except:
-            app.storage.user.update({ 'username': username.value, 'authenticated': False })
+            app.storage.user.update({ 'username': try_username, 'authenticated': False })
             ui.notify('Wrong username or password', color='negative')
 
     if app.storage.user.get('authenticated', False):

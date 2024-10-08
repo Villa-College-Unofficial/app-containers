@@ -3,6 +3,7 @@ import socket
 import subprocess
 import threading
 
+# Deprecated: Not used at the moment
 class AppProxy:
 
     cont: Container = None

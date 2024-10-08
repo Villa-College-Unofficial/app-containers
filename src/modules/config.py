@@ -28,7 +28,6 @@ class Config:
         with open(yaml_path, mode="r", encoding="utf8") as stream:
             try:
                 self.vars = yaml.safe_load(stream)
-                print(self.vars)
             except yaml.YAMLError as err:
                 raise err
 

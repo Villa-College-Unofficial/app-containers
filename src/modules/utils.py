@@ -10,8 +10,10 @@ def overlaymount(destination:str, lowerdirs:list[str], upperdir:str, workdir:str
     try:
         mount("overlay", destination, "overlay", data=f'lowerdir={":".join(lowerdirs)},upperdir={upperdir},workdir={workdir}')
         return True
-    except OSError as e:
+    except Exception as e:
+        print("\n\n\n")
         print(e)
+        print("\n\n\n")
         return False
 
 def unmount(destination:str) -> bool:
@@ -30,11 +32,17 @@ def confirm(title:str = "Are you sure?", confirm_text:str = "YES", reject_text:s
             dialog.close()
             if confirm_action is not None:
                 confirm_action()
+                # try:
+                # except:
+                #     dialog.close()
 
         def reja():
             dialog.close()
             if reject_action is not None:
                 reject_action()
+                # try:
+                # except:
+                #     dialog.close()
 
         ui.label(title)
         if children_action is not None:

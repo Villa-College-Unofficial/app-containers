@@ -8,6 +8,7 @@ from nicegui.core import app
 from nicegui import ui
 from modules.utils import overlaymount, unmount
 from fastapi import WebSocket, Request
+import time
 
 class Container:
     """
@@ -88,19 +89,7 @@ class Container:
                 self.start()
         except:
             # TODO: get network name from config
-            # Create a new container if it doesn't exist
-            self.docker_network = client.networks.list(names=["bridge"])[0]
-            self.docker_container = client.containers.run(
-                current_config.apps()[app]["container"],
-                detach=True,
-                auto_remove=True,
-                name=self.name,
-                volumes=[f"{self.mergeddir}:{current_config.apps()[app]["mergedestination"]}"],
-                cap_add=current_config.apps()[app]["caps"],
-                devices=current_config.apps()[app]["devices"],
-                environment=current_config.apps()[app]["env"],
-                network=self.docker_network.name
-            )
+            pass
 
     def status(self: 'Container') -> 'Container.Status':
         """
@@ -131,12 +120,30 @@ class Container:
         """
         # Create a new mount
         mntsuccess = overlaymount(self.mergeddir, [current_config.apps()[self.appname]["lowerdir"]], upperdir=self.upperdir, workdir=self.workdir)
+        time.sleep(5) # Wait 5 seconds for mounts to complete
 
         if not mntsuccess:
             raise Exception(f"Failed to mount '{self.mergeddir}'. Aborting '{self.name}'!")
 
+        # Create a new container if it doesn't exist
+        self.docker_network = client.networks.list(names=["bridge"])[0]
+
+        self.docker_container = client.containers.run(
+            current_config.apps()[self.appname]["container"],
+            detach=True,
+            auto_remove=True,
+            name=self.name,
+            volumes=[f"{self.mergeddir}:{current_config.apps()[self.appname]["mergedestination"]}"],
+            cap_add=current_config.apps()[self.appname]["caps"],
+            devices=current_config.apps()[self.appname]["devices"],
+            environment=current_config.apps()[self.appname]["env"],
+            network=self.docker_network.name,
+            publish_all_ports=True
+        )
+
         self.docker_container.start()
-        return self.docker_container is not None
+        time.sleep(5)
+        return self.docker_container is not None and self.docker_container.status == "running"
 
     def logs(self: 'Container'):
         """
@@ -170,6 +177,12 @@ class Container:
             raise Exception(f"Failed to unmount '{self.mergeddir}'. Aborting stop '{self.name}'!")
         
         return not path.ismount(self.mergeddir)
+
+    @property
+    def ports():
+        if self.docker_container is None:
+            return None
+        return self.docker_container.attrs['NetworkSettings']['Ports']
 
     def destroy(self: 'Container') -> bool:
         """
